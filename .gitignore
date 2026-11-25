@@ -13,6 +13,7 @@ venv/
 *.key
 scripts/deploy-vps.ps1
 scripts/*.local.ps1
+workflows/*.local.json
 
 # Caches & generated outputs
 cache/

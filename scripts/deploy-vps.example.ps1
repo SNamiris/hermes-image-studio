@@ -18,16 +18,13 @@ if ([string]::IsNullOrWhiteSpace($KeyPath)) {
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $novelaiDir = Join-Path $repoRoot 'plugins\image_gen\novelai'
-$skillFile = Join-Path $repoRoot 'skills\novelai-prompting\SKILL.md'
+$comfyuiDir = Join-Path $repoRoot 'plugins\image_gen\comfyui'
+$novelaiSkill = Join-Path $repoRoot 'skills\novelai-prompting\SKILL.md'
+$comfyuiSkill = Join-Path $repoRoot 'skills\comfyui-workflow\SKILL.md'
+$workflowsDir = Join-Path $repoRoot 'workflows'
 
 if (-not (Test-Path -LiteralPath $KeyPath -PathType Leaf)) {
     throw "SSH key not found: $KeyPath"
-}
-if (-not (Test-Path -LiteralPath (Join-Path $novelaiDir '__init__.py') -PathType Leaf)) {
-    throw "NovelAI plugin not found in $novelaiDir"
-}
-if (-not (Test-Path -LiteralPath $skillFile -PathType Leaf)) {
-    throw "NovelAI skill not found at $skillFile"
 }
 
 $previousPath = $env:Path
@@ -52,21 +49,38 @@ try {
     }
 
     Write-Host "Ensuring target directories on $HostAddress..."
-    & ssh.exe @sshCommon $HostAddress 'mkdir -p ~/.hermes/plugins/image_gen/novelai ~/.hermes/skills/creative/novelai-prompting'
+    & ssh.exe @sshCommon $HostAddress 'mkdir -p ~/.hermes/plugins/image_gen/novelai ~/.hermes/plugins/image_gen/comfyui ~/.hermes/skills/creative/novelai-prompting ~/.hermes/skills/creative/comfyui-workflow ~/.hermes/comfyui/workflows'
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Host 'Uploading NovelAI plugin...'
-    $pluginFiles = @((Join-Path $novelaiDir 'plugin.yaml')) + (
+    $novelaiFiles = @((Join-Path $novelaiDir 'plugin.yaml')) + (
         Get-ChildItem -LiteralPath $novelaiDir -Filter '*.py' -File | Select-Object -ExpandProperty FullName
     )
-    & scp.exe @sshCommon @pluginFiles "${HostAddress}:~/.hermes/plugins/image_gen/novelai/"
+    & scp.exe @sshCommon @novelaiFiles "${HostAddress}:~/.hermes/plugins/image_gen/novelai/"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    Write-Host 'Uploading NovelAI prompting skill...'
-    & scp.exe @sshCommon `
-        $skillFile `
-        "${HostAddress}:~/.hermes/skills/creative/novelai-prompting/"
+    Write-Host 'Uploading ComfyUI plugin...'
+    $comfyuiFiles = @((Join-Path $comfyuiDir 'plugin.yaml')) + (
+        Get-ChildItem -LiteralPath $comfyuiDir -Filter '*.py' -File | Select-Object -ExpandProperty FullName
+    )
+    & scp.exe @sshCommon @comfyuiFiles "${HostAddress}:~/.hermes/plugins/image_gen/comfyui/"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    Write-Host 'Uploading skills...'
+    & scp.exe @sshCommon $novelaiSkill "${HostAddress}:~/.hermes/skills/creative/novelai-prompting/"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & scp.exe @sshCommon $comfyuiSkill "${HostAddress}:~/.hermes/skills/creative/comfyui-workflow/"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    $workflowFiles = @(
+        Get-ChildItem -LiteralPath $workflowsDir -Filter '*.json' -File -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty FullName
+    )
+    if ($workflowFiles.Count -gt 0) {
+        Write-Host "Uploading $($workflowFiles.Count) ComfyUI workflow file(s)..."
+        & scp.exe @sshCommon @workflowFiles "${HostAddress}:~/.hermes/comfyui/workflows/"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
 
     if (-not $NoRestart) {
         Write-Host 'Restarting hermes-gateway.service...'

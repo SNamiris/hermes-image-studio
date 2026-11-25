@@ -1,9 +1,9 @@
 # hermes-image-studio
 
-面向 **Hermes Agent** 的多后端生图插件与 Skill 仓库，统一管理：
+面向 **Hermes Agent** 的多后端生图插件与 Skill 仓库，统一管理双引擎：
 
-- **NovelAI（已实现，完整版）**：独立调用 NovelAI Diffusion V5 / V4.5 / V4 / V3，支持接管内置 `image_generate` 与完整参数工具 `novelai_generate` / `novelai_status`。
-- **ComfyUI（预留扩展）**：独立调用本地/远程 ComfyUI API 工作流（通过 Tailscale / SSH 反向隧道 / frp），并支持“本地 ComfyUI 优先 + NovelAI 自动兜底”的混合模式。
+- **NovelAI（默认主引擎）**：独立调用 NovelAI Diffusion V5 / V4.5 / V4 / V3，接管内置 `image_generate` 并提供完整参数工具 `novelai_generate` / `novelai_status`。
+- **ComfyUI（按需独立工具，经 Tailscale 回连本机）**：调用 ComfyUI 导出的 API Workflow JSON，注入正/负面提示词与少量关键参数，提供 `comfyui_generate` / `comfyui_status`（亦实现了 `ComfyUIImageGenProvider` 便于按需切换）。
 
 ---
 
@@ -21,12 +21,19 @@ hermes-image-studio/
 │       │   ├── media.py          # 图片加载/预处理、ZIP 解包与 Vibe 缓存
 │       │   ├── schemas.py        # novelai_generate / novelai_status 工具 Schema
 │       │   └── constants.py      # 模型目录、画质词、UC 预设与默认参数
-│       └── comfyui/              # ComfyUI 后端插件（规划中）
-│           └── README.md
+│       └── comfyui/              # ComfyUI API Workflow 插件（对应 VPS ~/.hermes/plugins/image_gen/comfyui/）
+│           ├── plugin.yaml
+│           ├── __init__.py       # ComfyUIImageGenProvider 与工具注册
+│           ├── client.py         # /system_stats 探活、/prompt 提交、/history 轮询、/view 拉图
+│           ├── workflow.py       # workflows/*.json 加载与节点参数注入（自动反查 + 显式映射）
+│           ├── schemas.py        # comfyui_generate / comfyui_status 工具 Schema
+│           ├── constants.py      # 超时、比例预设与 System Prompt 指引
+│           └── README.md         # Tailscale 连通与自定义节点映射说明
 ├── skills/
-│   └── novelai-prompting/        # 配套 Prompt Skill（对应 VPS ~/.hermes/skills/creative/novelai-prompting/）
-│       └── SKILL.md
-├── workflows/                    # 后续存放 ComfyUI API 格式工作流 JSON
+│   ├── novelai-prompting/SKILL.md # 配套 NovelAI Prompt Skill
+│   └── comfyui-workflow/SKILL.md  # 配套 ComfyUI Workflow Skill
+├── workflows/
+│   └── example-sdxl.json         # ComfyUI API 格式示例工作流（私有工作流可命名 *.local.json）
 └── scripts/
     └── deploy-vps.example.ps1    # 无敏感信息部署模板（复制为 deploy-vps.ps1 本地使用，已加入 .gitignore）
 ```
@@ -38,14 +45,22 @@ hermes-image-studio/
 - **接管内置 `image_generate`**：在 `~/.hermes/config.yaml` 设置 `image_gen.provider: novelai` 即可无缝用于 Telegram / CLI。
 - **专用完整工具 `novelai_generate`（toolset: `novelai`）**：
   - 模型：`nai-diffusion-5-full`（默认）、`nai-diffusion-5-curated`、`nai-diffusion-4-5-full`、`nai-diffusion-4-5-curated`、`nai-diffusion-4-full`、`nai-diffusion-4-curated-preview`、`nai-diffusion-3`、`nai-diffusion-furry-3`
-  - 负面提示词 `negative_prompt` + UC 预设（`heavy` / `light` / `furry_focus` / `human_focus` / `none`）+ 自动画质词 `quality_tags`
-  - V4 / V4.5 多角色提示词与坐标定位 `characters`
-  - 自定义宽高/比例（默认 `832x1216` / `1216x832` / `1024x1024`、`steps <= 28`，贴合 Opus 免费档）、`scale`、`cfg_rescale`、`sampler`、`noise_schedule`、`seed`、`variety_boost`
-  - 图生图 Img2Img（`source_image`、`strength`、`noise`）
-  - V4.5 精准参考 Precise / Character Reference（`character_references`，自动黑边填充至 `1024x1536` / `1536x1024` / `1472x1472`）
-  - 风格迁移 Vibe Transfer（`vibe_references`，V4/V4.5 自动调用 `/ai/encode-vibe` 并做本地缓存避免重复扣 Anlas）
+  - 负面提示词 `negative_prompt` + UC 预设 + 自动画质词 `quality_tags`
+  - V4 / V4.5 / V5 多角色提示词与坐标定位 `characters`
+  - 自定义宽高/比例、步数、CFG、采样器、调度器、固定 `seed`、`variety_boost`
+  - 图生图 Img2Img、Precise Reference（V5 支持 `outfit` 与 `strength 0.0–5.0`）、Vibe Transfer（V4.5/V4/V3）
 - **账号查询工具 `novelai_status`（toolset: `novelai`）**：查询订阅档位与剩余 Anlas。
-- **System Prompt 指引**：自动注册 `novelai_image_gen`，指导 Agent 输出英文 Danbooru/自然语言提示词，并在调用 `novelai_generate` 后输出 `MEDIA:<path>` 以触发 Telegram 自动发图。
+
+---
+
+## ComfyUI 插件能力清单
+
+- **独立按需工具 `comfyui_generate`（toolset: `comfyui`）**：
+  - 直接加载 ComfyUI 导出的 **API Workflow JSON**（`~/.hermes/comfyui/workflows/<name>.json`）
+  - 支持注入 `prompt`（必填）及少量可选关键参数：`negative_prompt`、`workflow`、`aspect_ratio` / `width` / `height`、`steps`、`cfg`、`seed`（未传的参数保留 workflow 原值；未传 `seed` 时自动随机防缓存命中）
+  - 自动沿采样器（`KSampler` / `SamplerCustomAdvanced` 等）上游连线定位正/负文本节点与 Latent 尺寸节点，亦支持 `<name>.meta.json` 或 `config.yaml` 显式 `node_id.field` 映射覆盖
+  - 3 秒快速 `/system_stats` 探活，本机未开机时立即返回明确提示
+- **状态探活工具 `comfyui_status`（toolset: `comfyui`）**：检测 Tailscale 远端 ComfyUI 是否在线、GPU 显存概况与可用 workflow 列表。
 
 ---
 
@@ -56,6 +71,7 @@ plugins:
   enabled:
     - platforms/telegram
     - image_gen/novelai
+    - image_gen/comfyui
 
 image_gen:
   provider: novelai
@@ -70,20 +86,26 @@ image_gen:
     uc_preset: heavy
     quality_tags: true
     variety_boost: false
+  comfyui:
+    default_workflow: default
+    timeout: 180
 
 platform_toolsets:
   cli:
     - hermes-cli
     - novelai
+    - comfyui
   telegram:
     - hermes-telegram
     - novelai
+    - comfyui
 ```
 
-密钥存放在 VPS 的 `~/.hermes/.env`（权限 `600`，不要提交到仓库）：
+密钥与私有地址存放在 VPS 的 `~/.hermes/.env`（权限 `600`，不要提交到仓库）：
 
 ```dotenv
 NOVELAI_API_KEY=pst-...
+COMFYUI_BASE_URL=http://<your-tailscale-ip>:8188
 ```
 
 ---
