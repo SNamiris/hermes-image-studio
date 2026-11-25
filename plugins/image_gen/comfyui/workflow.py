@@ -21,7 +21,7 @@ from .constants import (
 logger = logging.getLogger(__name__)
 
 _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
-_TEXT_FIELDS = ("text", "clip_l", "t5xxl", "prompt", "string", "value")
+_TEXT_FIELDS = ("text", "text_g", "text_l", "clip_l", "t5xxl", "prompt", "string", "value")
 
 
 def hermes_home() -> Path:
@@ -185,9 +185,9 @@ def _set_text_on_node(node: dict[str, Any], value: str) -> Optional[str]:
         if field in inputs and isinstance(inputs[field], str):
             inputs[field] = value
             return field
-    # CLIPTextEncodeFlux uses clip_l + t5xxl
+    # Dual-field encoders: CLIPTextEncodeSDXL (text_g + text_l) and CLIPTextEncodeFlux (clip_l + t5xxl)
     updated: list[str] = []
-    for field in ("clip_l", "t5xxl"):
+    for field in ("text_g", "text_l", "clip_l", "t5xxl"):
         if field in inputs and isinstance(inputs[field], str):
             inputs[field] = value
             updated.append(field)
@@ -195,7 +195,7 @@ def _set_text_on_node(node: dict[str, Any], value: str) -> Optional[str]:
 
 
 def _apply_explicit_target(graph: dict[str, Any], target_spec: Any, value: Any) -> bool:
-    """Apply value to one or more ``'node_id.field'`` targets."""
+    """Apply value to one or more ``'node_id.field'`` targets (requires existing input field)."""
     specs = [target_spec] if isinstance(target_spec, str) else list(target_spec) if isinstance(target_spec, list) else []
     applied = False
     for spec in specs:
@@ -203,30 +203,51 @@ def _apply_explicit_target(graph: dict[str, Any], target_spec: Any, value: Any) 
             continue
         nid, field = spec.split(".", 1)
         node = graph.get(nid.strip())
-        if isinstance(node, dict) and isinstance(node.get("inputs"), dict):
-            node["inputs"][field.strip()] = value
+        field_name = field.strip()
+        if isinstance(node, dict) and isinstance(node.get("inputs"), dict) and field_name in node["inputs"]:
+            node["inputs"][field_name] = value
             applied = True
     return applied
 
 
-def _align_8(value: int, *, minimum: int = 64, maximum: int = 2048) -> int:
+def _align_16(value: int, *, minimum: int = 64, maximum: int = 2048) -> int:
     clamped = max(minimum, min(maximum, int(value)))
-    return max(minimum, (clamped // 8) * 8)
+    return max(minimum, (clamped // 16) * 16)
 
 
-def _find_samplers(graph: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
-    exact = [
-        (nid, node)
-        for nid, node in graph.items()
-        if isinstance(node, dict) and str(node.get("class_type") or "") in SAMPLER_CLASS_TYPES
+def _reachable_from_save_nodes(graph: dict[str, Any]) -> set[str]:
+    """Collect node IDs upstream of SaveImage nodes so multi-branch graphs target the saved branch first."""
+    save_ids = [
+        nid for nid, node in graph.items()
+        if isinstance(node, dict) and str(node.get("class_type") or "") == "SaveImage"
     ]
+    if not save_ids:
+        return set(graph.keys())
+    visited: set[str] = set()
+    queue = list(save_ids)
+    while queue:
+        nid = queue.pop(0)
+        if nid in visited:
+            continue
+        visited.add(nid)
+        node = graph.get(nid)
+        inputs = node.get("inputs") if isinstance(node, dict) else None
+        if isinstance(inputs, dict):
+            for val in inputs.values():
+                if _is_link(val):
+                    queue.append(str(val[0]))
+    return visited
+
+
+def _find_samplers(graph: dict[str, Any], active_ids: set[str]) -> list[tuple[str, dict[str, Any]]]:
+    items = [(nid, node) for nid, node in graph.items() if nid in active_ids and isinstance(node, dict)]
+    if not items:
+        items = [(nid, node) for nid, node in graph.items() if isinstance(node, dict)]
+    exact = [(nid, node) for nid, node in items if str(node.get("class_type") or "") in SAMPLER_CLASS_TYPES]
     if exact:
         return exact
-    # Fallback: any node whose class_type contains KSampler or has both steps & cfg inputs
     fallback: list[tuple[str, dict[str, Any]]] = []
-    for nid, node in graph.items():
-        if not isinstance(node, dict):
-            continue
+    for nid, node in items:
         ctype = str(node.get("class_type") or "")
         inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
         if "KSampler" in ctype or ("steps" in inputs and ("seed" in inputs or "noise_seed" in inputs)):
@@ -242,14 +263,13 @@ def _inject_prompt_text(
     text: str,
     explicit_mapping: dict[str, Any],
 ) -> bool:
-    if role in explicit_mapping and _apply_explicit_target(graph, explicit_mapping[role], text):
-        return True
+    if role in explicit_mapping:
+        return _apply_explicit_target(graph, explicit_mapping[role], text)
 
+    updated_nodes: set[str] = set()
     for _, sampler in samplers:
         inputs = sampler.get("inputs") if isinstance(sampler.get("inputs"), dict) else {}
-        # Standard KSampler: inputs["positive"] / inputs["negative"]
         start = inputs.get(role)
-        # SamplerCustomAdvanced: inputs["guider"] -> CFGGuider/BasicGuider -> positive/negative/conditioning
         if start is None and "guider" in inputs:
             guider = _follow_upstream(
                 graph,
@@ -263,9 +283,9 @@ def _inject_prompt_text(
                 start = g_inputs.get(role) or (g_inputs.get("conditioning") if role == "positive" else None)
 
         hit = _follow_upstream(graph, start, _is_text_node)
-        if hit is not None and _set_text_on_node(hit[1], text):
-            return True
-    return False
+        if hit is not None and hit[0] not in updated_nodes and _set_text_on_node(hit[1], text):
+            updated_nodes.add(hit[0])
+    return bool(updated_nodes)
 
 
 def _inject_sampler_scalar(
@@ -329,7 +349,8 @@ def inject_workflow_params(
     """Return ``(mutated_workflow_copy, applied_params_summary)``."""
     graph = copy.deepcopy(workflow)
     mapping = explicit_mapping or {}
-    samplers = _find_samplers(graph)
+    active_ids = _reachable_from_save_nodes(graph)
+    samplers = _find_samplers(graph, active_ids)
     applied: dict[str, Any] = {}
 
     if not _inject_prompt_text(graph, samplers, role="positive", text=prompt, explicit_mapping=mapping):
@@ -386,7 +407,7 @@ def inject_workflow_params(
     target_w: Optional[int] = None
     target_h: Optional[int] = None
     if width and height:
-        target_w, target_h = _align_8(width), _align_8(height)
+        target_w, target_h = _align_16(width), _align_16(height)
     elif isinstance(aspect_ratio, str) and aspect_ratio.strip().lower() in ASPECT_DIMENSIONS:
         target_w, target_h = ASPECT_DIMENSIONS[aspect_ratio.strip().lower()]
 
@@ -394,16 +415,22 @@ def inject_workflow_params(
         w_ok = "width" in mapping and _apply_explicit_target(graph, mapping["width"], target_w)
         h_ok = "height" in mapping and _apply_explicit_target(graph, mapping["height"], target_h)
         if not (w_ok and h_ok):
-            for node in graph.values():
-                if not isinstance(node, dict):
+            for nid, node in graph.items():
+                if nid not in active_ids or not isinstance(node, dict):
                     continue
                 ctype = str(node.get("class_type") or "")
                 inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
-                if ctype in LATENT_CLASS_TYPES and "width" in inputs and "height" in inputs:
-                    if not w_ok and not _is_link(inputs["width"]):
+                if (
+                    ctype in LATENT_CLASS_TYPES
+                    and "width" in inputs
+                    and "height" in inputs
+                    and not _is_link(inputs["width"])
+                    and not _is_link(inputs["height"])
+                ):
+                    if not w_ok:
                         inputs["width"] = target_w
                         w_ok = True
-                    if not h_ok and not _is_link(inputs["height"]):
+                    if not h_ok:
                         inputs["height"] = target_h
                         h_ok = True
                     if w_ok and h_ok:

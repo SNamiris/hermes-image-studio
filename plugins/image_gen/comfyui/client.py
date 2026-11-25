@@ -260,7 +260,15 @@ def generate_comfyui(
                 prompt=prompt,
             )
         submit_body = submit.json()
-        prompt_id = submit_body.get("prompt_id")
+        if isinstance(submit_body, dict) and submit_body.get("node_errors"):
+            return error_response(
+                error=f"ComfyUI workflow '{wf_name}' has node validation errors: {_extract_http_error(submit)}",
+                error_type="api_error",
+                provider="comfyui",
+                model=wf_name,
+                prompt=prompt,
+            )
+        prompt_id = submit_body.get("prompt_id") if isinstance(submit_body, dict) else None
         if not prompt_id:
             return error_response(
                 error=f"ComfyUI did not return a prompt_id: {submit_body}",
@@ -283,11 +291,14 @@ def generate_comfyui(
     poll_interval = max(0.3, float(conf.get("poll_interval") or DEFAULT_POLL_INTERVAL))
     deadline = time.monotonic() + gen_timeout
     chosen_image: Optional[dict[str, Any]] = None
+    last_http_error: Optional[str] = None
 
     while time.monotonic() < deadline:
+        remaining = max(1.0, deadline - time.monotonic())
         try:
-            hist_resp = requests.get(f"{base_url}/history/{prompt_id}", timeout=req_timeout)
+            hist_resp = requests.get(f"{base_url}/history/{prompt_id}", timeout=min(req_timeout, remaining))
             if hist_resp.ok:
+                last_http_error = None
                 hist = hist_resp.json()
                 entry = hist.get(prompt_id) if isinstance(hist, dict) else None
                 if isinstance(entry, dict):
@@ -312,6 +323,8 @@ def generate_comfyui(
                             model=wf_name,
                             prompt=prompt,
                         )
+            elif hist_resp.status_code != 404:
+                last_http_error = f"HTTP {hist_resp.status_code}: {_extract_http_error(hist_resp)}"
         except requests.RequestException as exc:
             return error_response(
                 error=f"Lost connection to ComfyUI while waiting for result: {exc}",
@@ -320,11 +333,14 @@ def generate_comfyui(
                 model=wf_name,
                 prompt=prompt,
             )
-        time.sleep(poll_interval)
+        sleep_for = min(poll_interval, max(0.0, deadline - time.monotonic()))
+        if sleep_for > 0:
+            time.sleep(sleep_for)
 
     if chosen_image is None:
+        detail = f" Last polling error: {last_http_error}" if last_http_error else ""
         return error_response(
-            error=f"ComfyUI generation timed out after {int(gen_timeout)}s (prompt_id={prompt_id}).",
+            error=f"ComfyUI generation timed out after {int(gen_timeout)}s (prompt_id={prompt_id}).{detail}",
             error_type="timeout",
             provider="comfyui",
             model=wf_name,

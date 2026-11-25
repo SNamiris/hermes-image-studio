@@ -37,11 +37,11 @@ COMFYUI_GENERATE_SCHEMA: dict[str, Any] = {
             },
             "width": {
                 "type": "integer",
-                "description": "Optional custom width in pixels (aligned to multiple of 8). Must be paired with height.",
+                "description": "Optional custom width in pixels (aligned to multiple of 16). Must be paired with height.",
             },
             "height": {
                 "type": "integer",
-                "description": "Optional custom height in pixels (aligned to multiple of 8). Must be paired with width.",
+                "description": "Optional custom height in pixels (aligned to multiple of 16). Must be paired with width.",
             },
             "steps": {
                 "type": "integer",
