@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Secrets & local state
+.env
+.env.*
+*.pem
+*.key
+scripts/deploy-vps.ps1
+scripts/*.local.ps1
+
+# Caches & generated outputs
+cache/
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# OS & editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

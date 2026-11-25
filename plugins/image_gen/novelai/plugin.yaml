@@ -1,0 +1,7 @@
+name: novelai
+version: 1.0.0
+description: "NovelAI image generation backend (NAI Diffusion 4.5 / 4 / 3, multi-character prompts, img2img, precise character/style reference, vibe transfer, and Anlas status)."
+author: custom
+kind: backend
+requires_env:
+  - NOVELAI_API_KEY
