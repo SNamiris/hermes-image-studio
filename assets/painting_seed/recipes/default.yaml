@@ -1,0 +1,11 @@
+description: A solo anime illustration with a clear subject, setting, and composition.
+slots:
+  subject: subject
+  hair_eyes: hair_eyes
+  outfit: outfit
+  pose: pose
+  expression: expression
+  accessories: accessories
+  scene: scene
+  lighting: lighting
+  camera: camera

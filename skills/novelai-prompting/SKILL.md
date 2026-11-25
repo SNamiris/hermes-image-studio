@@ -27,6 +27,8 @@ description: Guide for generating high-quality anime and illustration images usi
 
 ## Prompt Craft for NAI Diffusion 5 / 4.5
 
+Load `hermes-image-studio:prompt-craft` for random rolls, specific wildcard pools, artist presets, or tag guides. Roll with `--target nai`, refine the slots, and pass the resulting prompt to `novelai_generate`.
+
 - **Language**: Always translate Chinese or other requests into English tags + concise natural English scene phrasing.
 - **Structure**:
   1. Subject count & gender: `1girl, solo` or `2girls` (with `characters` list for multi-character scenes).

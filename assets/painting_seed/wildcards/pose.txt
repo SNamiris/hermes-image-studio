@@ -1,0 +1,19 @@
+# Prefer poses that work with both close and wide compositions.
+2::looking at viewer, turned torso
+looking back, over shoulder
+hand on hip, looking to the side
+hands in pockets, relaxed posture
+crossed arms, standing
+sitting, hands on knees
+sitting, chin rest
+leaning forward, clasped hands
+arms behind back, slight head tilt
+adjusting collar, looking down
+one hand raised, open palm
+tucking hair behind ear, looking away
+walking, mid-stride
+looking up, outstretched hand
+kneeling, hands on thighs
+reaching forward, open hand
+back to viewer, looking over shoulder
+standing, {shifting weight to one leg|one foot forward}

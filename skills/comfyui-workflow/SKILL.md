@@ -13,6 +13,8 @@ description: Guide for invoking the user's remote/Tailscale ComfyUI API workflow
 
 ## Calling `comfyui_generate`
 
+Load `hermes-image-studio:prompt-craft` for random rolls, specific wildcard pools, artist presets, or tag guides. Roll with `--target comfyui` and refine the draft for the selected checkpoint.
+
 - Pass `prompt` in English matching the workflow's checkpoint style (Danbooru tags for SDXL/Illustrious/Pony, natural language for Flux/Qwen-Image).
 - **Preserve workflow defaults**: Only pass `negative_prompt`, `aspect_ratio`/`width`/`height`, `steps`, `cfg`, or `seed` when the user asks to override them. Leaving them omitted preserves the tuned defaults inside the exported workflow JSON.
 - **Batch generation**: Pass `count` (1–8) to run the same prompt sequentially with distinct seeds (increments by +1 when a fixed `seed` is given) without increasing GPU VRAM usage.

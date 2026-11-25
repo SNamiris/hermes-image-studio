@@ -1,0 +1,19 @@
+# Match the direction and temperature to the scene during refinement.
+2::soft lighting, warm highlights
+golden hour, long shadows
+overcast lighting, soft shadows
+window light, dust motes
+moonlight, cool shadows
+rim lighting, backlighting
+candlelight, warm glow
+sunbeam, dappled light
+neon lighting, colored reflections
+stage spotlight, dark corners
+bright sunlight, crisp shadows
+misty lighting, low contrast
+reflected light, soft specular highlights
+indirect daylight, gentle gradients
+lamplight, amber pools of light
+twilight, blue ambient light
+chiaroscuro, deep shadows
+{pink|lavender} ambient light, muted highlights

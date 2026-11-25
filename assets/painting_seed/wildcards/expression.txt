@@ -1,0 +1,19 @@
+# Choose a single readable expression.
+2::gentle smile, relaxed eyes
+slight smile, raised eyebrow
+grin, closed eyes
+smirk, half-closed eyes
+serious, narrowed eyes
+neutral expression, closed mouth
+thoughtful expression, gaze averted
+surprised, wide eyes, parted lips
+determined expression, furrowed brow
+sleepy, droopy eyes
+pensive, downcast eyes
+soft blush, shy smile
+amused expression, one eyebrow raised
+focused, lips pressed together
+sad smile, watery eyes
+wistful expression, distant gaze
+laughing, open mouth
+{curious|skeptical} expression, raised eyebrows

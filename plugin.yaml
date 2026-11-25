@@ -1,0 +1,15 @@
+name: hermes-image-studio
+version: 2.0.0
+description: "Unified image generation studio for Hermes Agent: NovelAI V5/4.5, ComfyUI API workflows, and extensible prompt-craft wildcards/tag-guides/artist-presets kit."
+author: custom
+kind: backend
+python_dependencies:
+  - PyYAML>=6,<7
+optional_env:
+  - NOVELAI_API_KEY
+  - COMFYUI_BASE_URL
+provides_tools:
+  - novelai_generate
+  - novelai_status
+  - comfyui_generate
+  - comfyui_status

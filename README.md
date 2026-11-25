@@ -7,38 +7,76 @@
 
 ---
 
+## 安装和更新
+
+```bash
+hermes plugins install https://github.com/SNamiris/hermes-image-studio --enable
+hermes plugins validate ~/.hermes/plugins/hermes-image-studio
+hermes plugins update hermes-image-studio
+```
+
+如果之前通过脚本单独部署过两个后端，迁移时将 `plugins.enabled` 里的
+`image_gen/novelai` 和 `image_gen/comfyui` 换成 `hermes-image-studio`，停用旧插件以避免重复注册。
+原有的 `image_gen` 和 `platform_toolsets` 配置可以继续使用。重启 Hermes 或 Gateway 后，
+可通过 `skill_view` 加载 `hermes-image-studio:prompt-craft`、
+`hermes-image-studio:novelai-prompting` 和 `hermes-image-studio:comfyui-workflow`。
+
 ## 目录结构
 
 ```text
 hermes-image-studio/
-├── plugins/
-│   └── image_gen/
-│       ├── novelai/              # NovelAI 后端插件（对应 VPS ~/.hermes/plugins/image_gen/novelai/）
-│       │   ├── plugin.yaml
-│       │   ├── __init__.py       # 插件入口、ImageGenProvider 与工具注册
-│       │   ├── client.py         # NovelAI HTTP 执行与账号状态查询
-│       │   ├── payload.py        # 配置读取、模型判定与请求参数构建
-│       │   ├── media.py          # 图片加载/预处理、ZIP 解包与 Vibe 缓存
-│       │   ├── schemas.py        # novelai_generate / novelai_status 工具 Schema
-│       │   └── constants.py      # 模型目录、画质词、UC 预设与默认参数
-│       └── comfyui/              # ComfyUI API Workflow 插件（对应 VPS ~/.hermes/plugins/image_gen/comfyui/）
-│           ├── plugin.yaml
-│           ├── __init__.py       # ComfyUIImageGenProvider 与工具注册
-│           ├── client.py         # /system_stats 探活、/prompt 提交、/history 轮询、/view 拉图
-│           ├── workflow.py       # workflows/*.json 加载与节点参数注入（自动反查 + 显式映射）
-│           ├── schemas.py        # comfyui_generate / comfyui_status 工具 Schema
-│           ├── constants.py      # 超时、比例预设与 System Prompt 指引
-│           └── README.md         # Tailscale 连通与自定义节点映射说明
+├── plugin.yaml                   # Hermes 插件清单
+├── __init__.py                    # 统一注册两个后端和三个 Skill
+├── plugins/image_gen/
+│   ├── novelai/                   # NovelAI Provider 和工具
+│   └── comfyui/                   # ComfyUI Provider 和工具
+├── prompt_kit/                    # 本地提示词抽选、检索和初始化
+├── assets/painting_seed/          # 示例词库与配方
 ├── skills/
-│   ├── novelai-prompting/SKILL.md # 配套 NovelAI Prompt Skill
-│   └── comfyui-workflow/SKILL.md  # 配套 ComfyUI Workflow Skill
-├── workflows/
-│   └── example-sdxl.json         # ComfyUI API 格式示例工作流（私有工作流可命名 *.local.json）
-└── scripts/
-    └── deploy-vps.example.ps1    # 无敏感信息部署模板（复制为 deploy-vps.ps1 本地使用，已加入 .gitignore）
+│   ├── prompt-craft/              # 抽选、提示词改写和参考指南
+│   ├── novelai-prompting/
+│   └── comfyui-workflow/
+└── workflows/example-sdxl.json     # ComfyUI API 格式示例工作流
 ```
 
----
+## 提示词工坊
+
+用户词库默认保存在 `~/painting/`，插件更新时由 Hermes 单独管理插件代码。
+可用 `--data-dir <path>` 或 `HERMES_PAINTING_DIR` 指定数据目录，命令行参数优先。
+
+```text
+~/painting/
+├── wildcards/   # .txt 或 YAML 词库，支持子目录
+├── recipes/     # YAML 配方，slots 映射的顺序就是抽选顺序
+├── artists/     # YAML 或 JSON 画师预设
+└── guides/      # 私有 Markdown 指南，和内置指南一起检索
+```
+
+直接放在 `~/painting/` 下的 `.txt`、`.yaml` 和 `.yml` 也可作为词库。
+同名文件优先使用 `wildcards/` 下的版本。TXT 每行一个候选项，支持 `3::silver hair` 抽样权重、
+`{red|blue|2::golden}` 行内分支和 `__outfit/casual__` 词库引用。YAML 支持列表和嵌套分组，分组叶项一起抽选。
+
+用安装了 PyYAML 的 Python 3.10+ 运行以下命令。从仓库运行时也可用 `python -m prompt_kit.cli`。
+
+```bash
+kit=~/.hermes/plugins/hermes-image-studio/skills/prompt-craft/scripts/prompt_kit.py
+python3 "$kit" init
+python3 "$kit" list --kind wildcards
+python3 "$kit" roll --target nai --seed 42
+python3 "$kit" roll --recipe scene_cinematic --count 2 --target comfyui
+python3 "$kit" roll -f hair_eyes.txt -f 'outfit,accessories:2,scene' --target nai
+python3 "$kit" roll -f outfit,scene --lock 'scene=snowy shrine' --exclude accessories
+python3 "$kit" artists search --style painterly --engine nai
+python3 "$kit" guides show tag-guide --format text
+```
+
+`init` 跳过已有文件。只有显式传入 `--overwrite` 才会替换已有的同名种子文件。
+没有默认配方时，`roll` 从顶层词库各抽一项。`-f` 按输入顺序选择词库，`-f 'outfit/*'` 按名称展开该子目录里的匹配文件。
+`accessories:2` 从同一池抽取两个不同条目。`--lock` 固定或添加槽位，`--exclude` 优先排除槽位。
+输出默认使用 JSON，包含槽位、来源、提示词和抽选种子。`--format text` 可直接阅读提示词。
+
+需要加入画师预设时可传 `--with-artist`、`--artist-style <style>` 或 `--artist-id <id>`。
+配方和画师预设的示例位于 `assets/painting_seed/recipes/` 和 `assets/painting_seed/artists/README.yaml`。
 
 ## NovelAI 插件能力清单
 
@@ -70,8 +108,7 @@ hermes-image-studio/
 plugins:
   enabled:
     - platforms/telegram
-    - image_gen/novelai
-    - image_gen/comfyui
+    - hermes-image-studio
 
 image_gen:
   provider: novelai
@@ -110,23 +147,7 @@ COMFYUI_BASE_URL=http://<your-tailscale-ip>:8188
 
 ---
 
-## 同步部署到 VPS
+## 旧版部署脚本
 
-方式一：直接通过参数或环境变量运行模板脚本：
-
-```powershell
-.\scripts\deploy-vps.example.ps1 -HostAddress "ubuntu@your-server-ip" -KeyPath "C:\path\to\key.pem"
-# 如需走本地 SOCKS5 代理（如 10808 端口），可额外传入 -SocksProxyPort 10808
-```
-
-方式二：复制 `scripts/deploy-vps.example.ps1` 为 `scripts/deploy-vps.ps1`（已被 `.gitignore` 忽略），填入你自己的服务器地址和密钥路径后直接运行：
-
-```powershell
-.\scripts\deploy-vps.ps1
-```
-
-如果只想同步文件而不重启 gateway：
-
-```powershell
-.\scripts\deploy-vps.ps1 -NoRestart
-```
+`scripts/deploy-vps.example.ps1` 适用于旧版分离式部署。新版插件使用 `hermes plugins install`
+和 `hermes plugins update`。自定义 ComfyUI 工作流仍放在 `~/.hermes/comfyui/workflows/`。

@@ -1,0 +1,19 @@
+# Adult solo illustration subjects. Keep occupation cues optional when refining.
+3::1girl, solo, adult woman
+2::1boy, solo, adult man
+1girl, solo, adult woman, elf
+1boy, solo, adult man, elf
+1girl, solo, adult woman, witch
+1boy, solo, adult man, wizard
+1girl, solo, adult woman, knight
+1boy, solo, adult man, knight
+1girl, solo, adult woman, botanist
+1boy, solo, adult man, photographer
+1girl, solo, adult woman, astronomer
+1boy, solo, adult man, bookseller
+1girl, solo, adult woman, dancer
+1boy, solo, adult man, violinist
+1girl, solo, adult woman, fox ears
+1boy, solo, adult man, cat ears
+1girl, solo, adult woman, android
+1boy, solo, adult man, android

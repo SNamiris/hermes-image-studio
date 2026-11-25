@@ -1,0 +1,19 @@
+# Outfit silhouettes spanning casual, period, and fantasy scenes.
+2::oversized sweater, {pleated skirt|wide-leg pants}
+white shirt, rolled up sleeves, tailored vest
+black turtleneck, long coat, trousers
+hooded jacket, cargo pants, lace-up boots
+denim jacket, striped shirt, cuffed jeans
+linen shirt, suspenders, high-waist trousers
+cardigan, scarf, dark jeans
+kimono, floral print, obi
+haori, hakama, tabi
+double-breasted coat, gloves, leather boots
+embroidered cloak, tunic, leather belt
+light armor, shoulder armor, cape
+suit, bow tie, dress shoes
+sailor collar, midi skirt, lace-up shoes
+wide sleeves, layered robe, sash
+raincoat, rubber boots, rolled cuffs
+pleated trousers, silk blouse, waistcoat
+knit vest, collared shirt, plaid skirt

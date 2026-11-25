@@ -1,0 +1,19 @@
+# Scene cues pair a recognizable setting with one physical detail.
+2::rainy cafe interior, condensation on window
+snowy shrine courtyard, stone lanterns
+rooftop garden, plants in terracotta pots
+quiet train platform, wet pavement
+glass greenhouse, climbing vines
+bookshop interior, crowded wooden shelves
+harbor promenade, moored fishing boats
+art studio, paint-stained easel
+mountain observatory, open dome
+old theater balcony, red velvet curtains
+coastal cliff, windswept grass
+alley at night, glowing paper lanterns
+subway concourse, tiled columns
+riverside stone steps, fallen leaves
+museum gallery, marble floor
+abandoned arcade, dark cabinets
+moonlit orchard, flowering trees
+{spring|autumn} park, wrought iron benches

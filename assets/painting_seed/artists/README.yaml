@@ -1,0 +1,12 @@
+# Keep this template or add your own YAML, YML, or JSON files in artists/.
+# Each preset needs a unique id and a positive prompt. For example:
+#
+# artists:
+#   - id: warm_painterly
+#     name: Warm painterly illustration
+#     styles: [painterly, warm]
+#     engines: [nai-v5, nai-v4.5]
+#     prompt: "artist:your_artist_tag, 0.8::artist:your_second_tag::"
+#     negative_prompt: ""
+#     notes: Use with soft window light and portraits.
+artists: []

@@ -1,0 +1,19 @@
+# Appearance bundles keep hair and eye color together.
+3::long silver hair, {blue|amber} eyes
+w=2::short black hair, bob cut, red eyes
+long black hair, blunt bangs, violet eyes
+short brown hair, side-swept bangs, green eyes
+white hair, braid, blue eyes
+blonde hair, ponytail, green eyes
+black hair, low ponytail, grey eyes
+blue hair, wavy hair, gold eyes
+pink hair, short hair, blue eyes
+auburn hair, long hair, hazel eyes
+purple hair, asymmetrical bangs, pink eyes
+green hair, short hair, grey eyes
+orange hair, messy hair, teal eyes
+platinum blonde hair, curly hair, brown eyes
+black hair, white streak, heterochromia
+brown hair, twin braids, amber eyes
+silver hair, slicked back hair, red eyes
+short hair, violet eyes, 1.2::silver hair::

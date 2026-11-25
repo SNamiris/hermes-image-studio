@@ -1,0 +1,19 @@
+# Framing and viewpoint. Refine for the chosen pose and setting.
+3::upper body, eye level
+portrait, shallow depth of field
+close-up, centered composition
+bust, three-quarter view
+cowboy shot, diagonal composition
+full body, negative space
+wide shot, subject off-center
+medium shot, foreground blur
+profile, shallow depth of field
+from below, strong perspective
+from above, foreshortening
+dutch angle, dynamic composition
+from behind, deep focus
+silhouette, wide shot
+full body, symmetrical framing
+low angle, architectural framing
+medium shot, reflected in glass
+{upper body|cowboy shot}, rule of thirds

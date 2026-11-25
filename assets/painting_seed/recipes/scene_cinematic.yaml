@@ -1,0 +1,12 @@
+description: A scene-first illustration with lighting, framing, and a solo focal point.
+slots:
+  scene: scene
+  lighting: lighting
+  camera: camera
+  subject: subject
+  hair_eyes: hair_eyes
+  outfit: outfit
+  pose: pose
+  accessories:
+    pool: accessories
+    count: 2
