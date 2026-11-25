@@ -16,6 +16,7 @@ DEFAULT_SCALE = 7.0
 DEFAULT_CFG_RESCALE = 0.0
 DEFAULT_UC_PRESET = "heavy"
 DEFAULT_TIMEOUT = 120.0
+MAX_BATCH_COUNT = 8
 
 MODELS: dict[str, dict[str, Any]] = {
     "nai-diffusion-5-full": {
@@ -177,8 +178,8 @@ SYSTEM_PROMPT_GUIDANCE = """## NovelAI Image Generation
 
 NovelAI is configured as your image generation backend (default: `nai-diffusion-5-full`, steps=23, scale=7.0, sampler=k_euler_ancestral, noise_schedule=karras, cfg_rescale=0.0).
 - Use `image_generate` for quick standard requests (text-to-image or simple edit/reference); it automatically delivers the image on Telegram.
-- Use `novelai_generate` when the user wants full NovelAI control: negative prompts (UC), multi-character prompts/positions (`characters`), fixed `seed`, custom `width`/`height`/`steps`/`scale`/`sampler`, `variety_boost`, img2img `strength`/`noise`, Precise Reference (`character_references`), or Vibe Transfer (`vibe_references`).
-- IMPORTANT: After calling `novelai_generate`, ALWAYS include the returned `media_tag` (exact `MEDIA:/abs/path/to/file.png` on its own line) in your final reply so Telegram attaches and sends the generated image.
+- Use `novelai_generate` when the user wants full NovelAI control: batch generation (`count` 1-8, serial to preserve Opus free tier and avoid 429), negative prompts (UC), multi-character prompts/positions (`characters`), fixed `seed`, custom `width`/`height`/`steps`/`scale`/`sampler`, `variety_boost`, img2img `strength`/`noise`, Precise Reference (`character_references`), or Vibe Transfer (`vibe_references`).
+- IMPORTANT: After calling `novelai_generate`, ALWAYS include every returned `MEDIA:/abs/path/to/file.png` line from `media_tag` / `media_tags` on its own line in your final reply so Telegram attaches and sends all generated images.
 - Use `novelai_status` if the user asks about their NovelAI subscription tier or remaining Anlas.
 - Write NovelAI prompts in English combining clean Danbooru tags and concise natural scene descriptions (V5 / V4.5 excel at both). Keep default resolutions at `832x1216`, `1216x832`, or `1024x1024` and `steps <= 28` unless larger sizes are requested (stays within Opus free-generation limits).
 """

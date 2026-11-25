@@ -1,4 +1,4 @@
-"""NovelAI HTTP execution: image generation and subscription status lookup."""
+"""NovelAI HTTP execution: image generation (single & serial batch) and subscription status."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from .constants import (
     DEFAULT_TIMEOUT,
     DEFAULT_UC_PRESET,
     GENERATE_URL,
+    MAX_BATCH_COUNT,
     SUBSCRIPTION_URL,
     TIER_NAMES,
     VALID_NOISE_SCHEDULES,
@@ -40,6 +41,72 @@ from .payload import (
 )
 
 
+def _post_single_generation(
+    *,
+    api_key: str,
+    model_id: str,
+    prompt: str,
+    ratio_label: str,
+    payload: dict[str, Any],
+    timeout: float,
+) -> tuple[Optional[str], Optional[dict[str, Any]]]:
+    """Send one /ai/generate-image request and return ``(saved_path, error_dict)``."""
+    try:
+        resp = requests.post(GENERATE_URL, headers=auth_headers(api_key), json=payload, timeout=timeout)
+    except requests.Timeout:
+        return None, error_response(
+            error=f"NovelAI image generation timed out after {int(timeout)}s.",
+            error_type="timeout",
+            provider="novelai",
+            model=model_id,
+            prompt=prompt,
+            aspect_ratio=ratio_label,
+        )
+    except requests.RequestException as exc:
+        return None, error_response(
+            error=f"NovelAI connection error: {exc}",
+            error_type="connection_error",
+            provider="novelai",
+            model=model_id,
+            prompt=prompt,
+            aspect_ratio=ratio_label,
+        )
+
+    if not resp.ok:
+        detail = extract_http_error(resp)
+        err_map = {
+            401: ("auth_error", f"NovelAI authentication failed (401): {detail}. Check NOVELAI_API_KEY."),
+            402: ("quota_error", f"NovelAI insufficient Anlas / subscription required (402): {detail}"),
+            429: ("rate_limit", f"NovelAI rate limit exceeded (429): {detail}. Wait a moment and retry."),
+        }
+        err_type, msg = err_map.get(
+            resp.status_code, ("api_error", f"NovelAI image generation failed ({resp.status_code}): {detail}")
+        )
+        return None, error_response(
+            error=msg,
+            error_type=err_type,
+            provider="novelai",
+            model=model_id,
+            prompt=prompt,
+            aspect_ratio=ratio_label,
+        )
+
+    try:
+        img_bytes, ext = extract_image_from_zip(resp.content)
+        b64_img = base64.b64encode(img_bytes).decode("ascii")
+        saved_path = save_b64_image(b64_img, prefix=f"novelai_{model_id.replace('-', '_')}", extension=ext)
+        return str(saved_path), None
+    except Exception as exc:
+        return None, error_response(
+            error=f"Failed to decode or save NovelAI image response: {exc}",
+            error_type="invalid_response",
+            provider="novelai",
+            model=model_id,
+            prompt=prompt,
+            aspect_ratio=ratio_label,
+        )
+
+
 def generate_novelai(
     *,
     prompt: str,
@@ -56,6 +123,7 @@ def generate_novelai(
     sampler: Optional[str] = None,
     noise_schedule: Optional[str] = None,
     seed: Optional[int] = None,
+    count: Optional[int] = None,
     quality_tags: Optional[bool] = None,
     variety_boost: Optional[bool] = None,
     source_image: Optional[str] = None,
@@ -64,7 +132,7 @@ def generate_novelai(
     character_references: Optional[list[dict[str, Any]]] = None,
     vibe_references: Optional[list[dict[str, Any]]] = None,
 ) -> dict[str, Any]:
-    """Execute a NovelAI generation request and save the result into Hermes's image cache."""
+    """Execute 1..8 NovelAI generation requests serially (n_samples=1 each to keep Opus free tier)."""
     cfg = load_novelai_config()
     api_key = get_api_key()
     model_id = (model or "").strip() or resolve_default_model(cfg)
@@ -86,6 +154,7 @@ def generate_novelai(
             prompt=prompt,
         )
 
+    resolved_count = max(1, min(MAX_BATCH_COUNT, int(1 if count is None else count)))
     timeout = float(cfg.get("timeout") or DEFAULT_TIMEOUT)
     use_quality = bool(cfg.get("quality_tags", True) if quality_tags is None else quality_tags)
     use_variety = bool(cfg.get("variety_boost", False) if variety_boost is None else variety_boost)
@@ -101,7 +170,7 @@ def generate_novelai(
     resolved_rescale = max(
         0.0, min(1.0, float(cfg_rescale if cfg_rescale is not None else cfg.get("cfg_rescale", DEFAULT_CFG_RESCALE)))
     )
-    resolved_seed = int(seed) if seed is not None and int(seed) >= 0 else random.randint(0, 2**32 - 1)
+    fixed_base_seed = int(seed) if seed is not None and int(seed) >= 0 else None
 
     source_pil: Optional[Image.Image] = None
     if source_image:
@@ -127,6 +196,7 @@ def generate_novelai(
         cfg,
     )
 
+    first_seed = fixed_base_seed if fixed_base_seed is not None else random.randint(0, 2**32 - 1)
     parameters = build_base_parameters(
         model_id=model_id,
         width=w,
@@ -138,7 +208,7 @@ def generate_novelai(
         use_quality=use_quality,
         cfg_rescale=resolved_rescale,
         noise_schedule=resolved_schedule,
-        seed=resolved_seed,
+        seed=first_seed,
         final_prompt=final_prompt,
         final_negative=final_negative,
         characters=characters,
@@ -150,7 +220,7 @@ def generate_novelai(
         parameters["image"] = pil_to_png_b64(fit_cover(source_pil, w, h))
         parameters["strength"] = max(0.01, min(0.99, float(0.7 if strength is None else strength)))
         parameters["noise"] = max(0.0, min(0.99, float(0.0 if noise is None else noise)))
-        parameters["extra_noise_seed"] = resolved_seed
+        parameters["extra_noise_seed"] = first_seed
 
     if character_references and vibe_references:
         return error_response(
@@ -182,82 +252,70 @@ def generate_novelai(
         if err:
             return err
 
-    payload = {"input": final_prompt, "model": model_id, "action": action, "parameters": parameters}
+    saved_paths: list[str] = []
+    used_seeds: list[int] = []
+    partial_error: Optional[str] = None
 
-    try:
-        resp = requests.post(GENERATE_URL, headers=auth_headers(api_key), json=payload, timeout=timeout)
-    except requests.Timeout:
-        return error_response(
-            error=f"NovelAI image generation timed out after {int(timeout)}s.",
-            error_type="timeout",
-            provider="novelai",
-            model=model_id,
-            prompt=prompt,
-            aspect_ratio=ratio_label,
-        )
-    except requests.RequestException as exc:
-        return error_response(
-            error=f"NovelAI connection error: {exc}",
-            error_type="connection_error",
-            provider="novelai",
-            model=model_id,
-            prompt=prompt,
-            aspect_ratio=ratio_label,
-        )
+    for idx in range(resolved_count):
+        if idx == 0:
+            item_seed = first_seed
+        elif fixed_base_seed is not None:
+            item_seed = (fixed_base_seed + idx) % (2**32)
+        else:
+            item_seed = random.randint(0, 2**32 - 1)
 
-    if not resp.ok:
-        detail = extract_http_error(resp)
-        err_map = {
-            401: ("auth_error", f"NovelAI authentication failed (401): {detail}. Check NOVELAI_API_KEY."),
-            402: ("quota_error", f"NovelAI insufficient Anlas / subscription required (402): {detail}"),
-            429: ("rate_limit", f"NovelAI rate limit exceeded (429): {detail}. Wait a moment and retry."),
-        }
-        err_type, msg = err_map.get(
-            resp.status_code, ("api_error", f"NovelAI image generation failed ({resp.status_code}): {detail}")
-        )
-        return error_response(
-            error=msg,
-            error_type=err_type,
-            provider="novelai",
-            model=model_id,
-            prompt=prompt,
-            aspect_ratio=ratio_label,
-        )
+        parameters["seed"] = item_seed
+        if source_pil is not None:
+            parameters["extra_noise_seed"] = item_seed
 
-    try:
-        img_bytes, ext = extract_image_from_zip(resp.content)
-        b64_img = base64.b64encode(img_bytes).decode("ascii")
-        saved_path = save_b64_image(b64_img, prefix=f"novelai_{model_id.replace('-', '_')}", extension=ext)
-    except Exception as exc:
-        return error_response(
-            error=f"Failed to decode or save NovelAI image response: {exc}",
-            error_type="invalid_response",
-            provider="novelai",
-            model=model_id,
+        payload = {"input": final_prompt, "model": model_id, "action": action, "parameters": parameters}
+        saved_path, err = _post_single_generation(
+            api_key=api_key,
+            model_id=model_id,
             prompt=prompt,
-            aspect_ratio=ratio_label,
+            ratio_label=ratio_label,
+            payload=payload,
+            timeout=timeout,
         )
+        if err:
+            if not saved_paths:
+                return err
+            partial_error = f"Stopped after {len(saved_paths)}/{resolved_count} images: {err.get('error')}"
+            break
+        saved_paths.append(saved_path)  # type: ignore[arg-type]
+        used_seeds.append(item_seed)
 
+    media_tags = [f"MEDIA:{p}" for p in saved_paths]
     modality = "image" if (source_pil is not None or character_references or vibe_references) else "text"
+    extra: dict[str, Any] = {
+        "images": saved_paths,
+        "media_tags": media_tags,
+        "media_tag": "\n".join(media_tags),
+        "count": len(saved_paths),
+        "requested_count": resolved_count,
+        "width": w,
+        "height": h,
+        "seed": used_seeds[0],
+        "seeds": used_seeds,
+        "steps": resolved_steps,
+        "scale": resolved_scale,
+        "sampler": resolved_sampler,
+        "noise_schedule": resolved_schedule,
+        "negative_prompt": final_negative,
+        "action": action,
+    }
+    if partial_error:
+        extra["partial"] = True
+        extra["partial_error"] = partial_error
+
     return success_response(
-        image=str(saved_path),
+        image=saved_paths[0],
         model=model_id,
         prompt=final_prompt,
         aspect_ratio=ratio_label,
         provider="novelai",
         modality=modality,
-        extra={
-            "media_tag": f"MEDIA:{saved_path}",
-            "width": w,
-            "height": h,
-            "seed": resolved_seed,
-            "steps": resolved_steps,
-            "scale": resolved_scale,
-            "sampler": resolved_sampler,
-            "noise_schedule": resolved_schedule,
-            "negative_prompt": final_negative,
-            "action": action,
-        },
+        extra=extra,
     )
 
 

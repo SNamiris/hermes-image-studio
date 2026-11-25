@@ -13,13 +13,14 @@ description: Guide for generating high-quality anime and illustration images usi
 
 2. **Full control (`novelai_generate`)**:
    - Use whenever the user specifies or benefits from:
+     - Batch generation with the same prompt (`count`: 1–8; runs serially with `n_samples=1` to stay Opus-free and avoid 429)
      - Multiple distinct characters with separate appearances or positions (`characters`)
      - Custom negative prompts (`negative_prompt`, `uc_preset`)
-     - Fixed seed replay (`seed`), custom dimensions (`width`, `height`), `steps`, `scale`, `cfg_rescale`, `sampler`, or `variety_boost`
+     - Fixed seed replay (`seed`, increments by +1 per image when `count > 1`), custom dimensions (`width`, `height`), `steps`, `scale`, `cfg_rescale`, `sampler`, or `variety_boost`
      - Image-to-image editing with controlled `strength` / `noise` (`source_image`)
      - V5 / V4.5 Precise Reference for keeping a character's identity or art style (`character_references`)
      - Vibe Transfer (`vibe_references`)
-   - **Mandatory Telegram delivery rule**: When `novelai_generate` succeeds, always include its `media_tag` (`MEDIA:/absolute/path/to/image.png`) on its own line in your reply.
+   - **Mandatory Telegram delivery rule**: When `novelai_generate` succeeds, always include every `MEDIA:/absolute/path/to/image.png` line from `media_tag` / `media_tags` on its own line in your reply so Telegram sends all generated images.
 
 3. **Account balance (`novelai_status`)**:
    - Use when the user asks about their NovelAI tier or remaining Anlas.

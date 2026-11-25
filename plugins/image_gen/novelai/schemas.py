@@ -107,7 +107,13 @@ NOVELAI_GENERATE_SCHEMA: dict[str, Any] = {
             },
             "seed": {
                 "type": "integer",
-                "description": "Fixed RNG seed for reproducibility. Omit for random seed.",
+                "description": "Fixed RNG seed for reproducibility (increments by +1 per image when count > 1). Omit for random seeds.",
+            },
+            "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8,
+                "description": "Number of images to generate sequentially with the same prompt (1-8, default 1; runs serially with n_samples=1 to keep Opus free tier and avoid 429 concurrency errors).",
             },
             "quality_tags": {
                 "type": "boolean",

@@ -53,7 +53,13 @@ COMFYUI_GENERATE_SCHEMA: dict[str, Any] = {
             },
             "seed": {
                 "type": "integer",
-                "description": "Optional fixed seed for reproducibility. Omit to generate a fresh random seed.",
+                "description": "Optional fixed seed for reproducibility (increments by +1 per run when count > 1). Omit to generate fresh random seeds.",
+            },
+            "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8,
+                "description": "Number of images to generate sequentially with the same prompt (1-8, default 1; runs serially to avoid GPU VRAM spikes).",
             },
         },
         "required": ["prompt"],

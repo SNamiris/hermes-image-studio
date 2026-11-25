@@ -81,11 +81,19 @@ def _handle_comfyui_generate(args: dict[str, Any], **kwargs: Any) -> str:
         steps=args.get("steps"),
         cfg=args.get("cfg"),
         seed=args.get("seed"),
+        count=args.get("count"),
     )
     if result.get("success"):
-        result["delivery_instruction"] = (
-            f"Include `{result['media_tag']}` on its own line in your final response to send this image."
-        )
+        tags = result.get("media_tags") or [result["media_tag"]]
+        if len(tags) > 1:
+            result["delivery_instruction"] = (
+                "Include every MEDIA line below on its own line in your final response to send all images:\n"
+                + "\n".join(tags)
+            )
+        else:
+            result["delivery_instruction"] = (
+                f"Include `{tags[0]}` on its own line in your final response to send this image."
+            )
     return json.dumps(result, ensure_ascii=False)
 
 

@@ -39,6 +39,8 @@ try {
         '-o', 'IdentitiesOnly=yes'
         '-o', 'StrictHostKeyChecking=yes'
         '-o', 'ConnectTimeout=15'
+        '-o', 'ServerAliveInterval=5'
+        '-o', 'ServerAliveCountMax=3'
     )
 
     if ($SocksProxyPort -gt 0 -and

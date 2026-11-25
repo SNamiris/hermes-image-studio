@@ -106,6 +106,7 @@ def _handle_novelai_generate(args: dict[str, Any], **kwargs: Any) -> str:
         sampler=args.get("sampler"),
         noise_schedule=args.get("noise_schedule"),
         seed=args.get("seed"),
+        count=args.get("count"),
         quality_tags=args.get("quality_tags"),
         variety_boost=args.get("variety_boost"),
         source_image=args.get("source_image"),
@@ -115,9 +116,16 @@ def _handle_novelai_generate(args: dict[str, Any], **kwargs: Any) -> str:
         vibe_references=args.get("vibe_references"),
     )
     if result.get("success"):
-        result["delivery_instruction"] = (
-            f"Include `{result['media_tag']}` on its own line in your final response to send this image."
-        )
+        tags = result.get("media_tags") or [result["media_tag"]]
+        if len(tags) > 1:
+            result["delivery_instruction"] = (
+                "Include every MEDIA line below on its own line in your final response to send all images:\n"
+                + "\n".join(tags)
+            )
+        else:
+            result["delivery_instruction"] = (
+                f"Include `{tags[0]}` on its own line in your final response to send this image."
+            )
     return json.dumps(result, ensure_ascii=False)
 
 

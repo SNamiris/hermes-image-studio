@@ -47,7 +47,7 @@ hermes-image-studio/
   - 模型：`nai-diffusion-5-full`（默认）、`nai-diffusion-5-curated`、`nai-diffusion-4-5-full`、`nai-diffusion-4-5-curated`、`nai-diffusion-4-full`、`nai-diffusion-4-curated-preview`、`nai-diffusion-3`、`nai-diffusion-furry-3`
   - 负面提示词 `negative_prompt` + UC 预设 + 自动画质词 `quality_tags`
   - V4 / V4.5 / V5 多角色提示词与坐标定位 `characters`
-  - 自定义宽高/比例、步数、CFG、采样器、调度器、固定 `seed`、`variety_boost`
+  - 自定义宽高/比例、步数、CFG、采样器、调度器、固定 `seed`、批量出图 `count`（1–8，串行 `n_samples=1` 保 Opus 免费并防 429）、`variety_boost`
   - 图生图 Img2Img、Precise Reference（V5 支持 `outfit` 与 `strength 0.0–5.0`）、Vibe Transfer（V4.5/V4/V3）
 - **账号查询工具 `novelai_status`（toolset: `novelai`）**：查询订阅档位与剩余 Anlas。
 
@@ -57,7 +57,7 @@ hermes-image-studio/
 
 - **独立按需工具 `comfyui_generate`（toolset: `comfyui`）**：
   - 直接加载 ComfyUI 导出的 **API Workflow JSON**（`~/.hermes/comfyui/workflows/<name>.json`）
-  - 支持注入 `prompt`（必填）及少量可选关键参数：`negative_prompt`、`workflow`、`aspect_ratio` / `width` / `height`、`steps`、`cfg`、`seed`（未传的参数保留 workflow 原值；未传 `seed` 时自动随机防缓存命中）
+  - 支持注入 `prompt`（必填）及少量可选关键参数：`negative_prompt`、`workflow`、`aspect_ratio` / `width` / `height`、`steps`、`cfg`、`seed`、`count`（1–8，串行执行避免爆显存，亦支持 workflow 内自带 `batch_size > 1` 全量拉回）
   - 自动沿采样器（`KSampler` / `SamplerCustomAdvanced` 等）上游连线定位正/负文本节点与 Latent 尺寸节点，亦支持 `<name>.meta.json` 或 `config.yaml` 显式 `node_id.field` 映射覆盖
   - 3 秒快速 `/system_stats` 探活，本机未开机时立即返回明确提示
 - **状态探活工具 `comfyui_status`（toolset: `comfyui`）**：检测 Tailscale 远端 ComfyUI 是否在线、GPU 显存概况与可用 workflow 列表。
