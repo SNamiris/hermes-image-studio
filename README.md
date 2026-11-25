@@ -2,7 +2,7 @@
 
 面向 **Hermes Agent** 的多后端生图插件与 Skill 仓库，统一管理：
 
-- **NovelAI（已实现，完整版）**：独立调用 NovelAI Diffusion V4.5 / V4 / V3，支持接管内置 `image_generate` 与完整参数工具 `novelai_generate` / `novelai_status`。
+- **NovelAI（已实现，完整版）**：独立调用 NovelAI Diffusion V5 / V4.5 / V4 / V3，支持接管内置 `image_generate` 与完整参数工具 `novelai_generate` / `novelai_status`。
 - **ComfyUI（预留扩展）**：独立调用本地/远程 ComfyUI API 工作流（通过 Tailscale / SSH 反向隧道 / frp），并支持“本地 ComfyUI 优先 + NovelAI 自动兜底”的混合模式。
 
 ---
@@ -15,7 +15,12 @@ hermes-image-studio/
 │   └── image_gen/
 │       ├── novelai/              # NovelAI 后端插件（对应 VPS ~/.hermes/plugins/image_gen/novelai/）
 │       │   ├── plugin.yaml
-│       │   └── __init__.py
+│       │   ├── __init__.py       # 插件入口、ImageGenProvider 与工具注册
+│       │   ├── client.py         # NovelAI HTTP 执行与账号状态查询
+│       │   ├── payload.py        # 配置读取、模型判定与请求参数构建
+│       │   ├── media.py          # 图片加载/预处理、ZIP 解包与 Vibe 缓存
+│       │   ├── schemas.py        # novelai_generate / novelai_status 工具 Schema
+│       │   └── constants.py      # 模型目录、画质词、UC 预设与默认参数
 │       └── comfyui/              # ComfyUI 后端插件（规划中）
 │           └── README.md
 ├── skills/
@@ -32,7 +37,7 @@ hermes-image-studio/
 
 - **接管内置 `image_generate`**：在 `~/.hermes/config.yaml` 设置 `image_gen.provider: novelai` 即可无缝用于 Telegram / CLI。
 - **专用完整工具 `novelai_generate`（toolset: `novelai`）**：
-  - 模型：`nai-diffusion-4-5-full`（默认）、`nai-diffusion-4-5-curated`、`nai-diffusion-4-full`、`nai-diffusion-4-curated-preview`、`nai-diffusion-3`、`nai-diffusion-furry-3`
+  - 模型：`nai-diffusion-5-full`（默认）、`nai-diffusion-5-curated`、`nai-diffusion-4-5-full`、`nai-diffusion-4-5-curated`、`nai-diffusion-4-full`、`nai-diffusion-4-curated-preview`、`nai-diffusion-3`、`nai-diffusion-furry-3`
   - 负面提示词 `negative_prompt` + UC 预设（`heavy` / `light` / `furry_focus` / `human_focus` / `none`）+ 自动画质词 `quality_tags`
   - V4 / V4.5 多角色提示词与坐标定位 `characters`
   - 自定义宽高/比例（默认 `832x1216` / `1216x832` / `1024x1024`、`steps <= 28`，贴合 Opus 免费档）、`scale`、`cfg_rescale`、`sampler`、`noise_schedule`、`seed`、`variety_boost`
@@ -54,13 +59,13 @@ plugins:
 
 image_gen:
   provider: novelai
-  model: nai-diffusion-4-5-full
+  model: nai-diffusion-5-full
   novelai:
-    model: nai-diffusion-4-5-full
+    model: nai-diffusion-5-full
     sampler: k_euler_ancestral
     noise_schedule: karras
-    steps: 28
-    scale: 5.0
+    steps: 23
+    scale: 7.0
     cfg_rescale: 0.0
     uc_preset: heavy
     quality_tags: true

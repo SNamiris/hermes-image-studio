@@ -56,10 +56,10 @@ try {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Host 'Uploading NovelAI plugin...'
-    & scp.exe @sshCommon `
-        (Join-Path $novelaiDir 'plugin.yaml') `
-        (Join-Path $novelaiDir '__init__.py') `
-        "${HostAddress}:~/.hermes/plugins/image_gen/novelai/"
+    $pluginFiles = @((Join-Path $novelaiDir 'plugin.yaml')) + (
+        Get-ChildItem -LiteralPath $novelaiDir -Filter '*.py' -File | Select-Object -ExpandProperty FullName
+    )
+    & scp.exe @sshCommon @pluginFiles "${HostAddress}:~/.hermes/plugins/image_gen/novelai/"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Host 'Uploading NovelAI prompting skill...'

@@ -1,6 +1,6 @@
 ---
 name: novelai-prompting
-description: Guide for generating high-quality anime and illustration images using the NovelAI plugin (NAI Diffusion 4.5 / 4 / 3), including Danbooru tag craft, multi-character prompts, img2img, Precise Character/Style Reference, and Vibe Transfer.
+description: Guide for generating high-quality anime and illustration images using the NovelAI plugin (NAI Diffusion 5 / 4.5 / 4 / 3), including Danbooru tag craft, multi-character prompts, img2img, Precise Character/Style Reference, and Vibe Transfer.
 ---
 
 # NovelAI Prompting & Generation Guide
@@ -8,7 +8,7 @@ description: Guide for generating high-quality anime and illustration images usi
 ## Choosing the Right Tool
 
 1. **Quick everyday image (`image_generate`)**:
-   - Use for simple text-to-image requests where default V4.5 settings and standard aspect ratios (`portrait`, `landscape`, `square`) are enough.
+   - Use for simple text-to-image requests where default V5 Full settings (`nai-diffusion-5-full`, steps=23, scale=7.0, `k_euler_ancestral`, `karras`, `cfg_rescale=0.0`) and standard aspect ratios (`portrait`, `landscape`, `square`) are enough.
    - Telegram delivers the output image automatically.
 
 2. **Full control (`novelai_generate`)**:
@@ -17,14 +17,14 @@ description: Guide for generating high-quality anime and illustration images usi
      - Custom negative prompts (`negative_prompt`, `uc_preset`)
      - Fixed seed replay (`seed`), custom dimensions (`width`, `height`), `steps`, `scale`, `cfg_rescale`, `sampler`, or `variety_boost`
      - Image-to-image editing with controlled `strength` / `noise` (`source_image`)
-     - V4.5 Precise Reference for keeping a character's identity or art style (`character_references`)
+     - V5 / V4.5 Precise Reference for keeping a character's identity or art style (`character_references`)
      - Vibe Transfer (`vibe_references`)
    - **Mandatory Telegram delivery rule**: When `novelai_generate` succeeds, always include its `media_tag` (`MEDIA:/absolute/path/to/image.png`) on its own line in your reply.
 
 3. **Account balance (`novelai_status`)**:
    - Use when the user asks about their NovelAI tier or remaining Anlas.
 
-## Prompt Craft for NAI Diffusion 4.5
+## Prompt Craft for NAI Diffusion 5 / 4.5
 
 - **Language**: Always translate Chinese or other requests into English tags + concise natural English scene phrasing.
 - **Structure**:
